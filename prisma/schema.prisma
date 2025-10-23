@@ -1,0 +1,295 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/clinic_management_system/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  name                 String?
+  email                String    @unique
+  emailVerified        DateTime?
+  image                String?
+  password             String?
+  role                 UserRole  @default(CLIENT)
+  isActive             Boolean   @default(true)
+  ethicsFormAccepted   Boolean   @default(false)
+  ethicsFormAcceptedAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  accounts             Account[]
+  sessions             Session[]
+  personnel            Personnel?
+  client               Client?
+}
+
+model Personnel {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  firstName       String
+  lastName        String
+  phone           String?
+  specialization  String?
+  workingHours    Json?     // Stores working schedule as JSON
+  photo           String?   // S3 path for photo
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  sessionNotes        SessionNote[]
+  assignments         Assignment[]
+}
+
+model Client {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  firstName       String
+  lastName        String
+  phone           String?
+  dateOfBirth     DateTime?
+  emergencyContact String?
+  emergencyPhone   String?
+  photo           String?   // S3 path for photo
+  isActive        Boolean   @default(true)
+  kvkk_consent    Boolean   @default(false)
+  consentDate     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  transactions        Transaction[]
+  clientPackages      ClientPackage[]
+  sessionNotes        SessionNote[]
+  assignments         Assignment[]
+}
+
+model Service {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  duration    Int         // Duration in minutes
+  price       Float
+  serviceType ServiceType
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  appointments    Appointment[]
+  packageServices PackageService[]
+}
+
+model Package {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  totalSessions   Int
+  totalPrice      Float
+  discountPercent Float?
+  validityDays    Int       // Package validity in days
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  packageServices PackageService[]
+  clientPackages  ClientPackage[]
+}
+
+model PackageService {
+  id         String  @id @default(cuid())
+  packageId  String
+  serviceId  String
+  sessions   Int     // Number of sessions for this service in package
+  
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  @@unique([packageId, serviceId])
+}
+
+model ClientPackage {
+  id              String    @id @default(cuid())
+  clientId        String
+  packageId       String
+  purchaseDate    DateTime  @default(now())
+  expiryDate      DateTime
+  sessionsUsed    Int       @default(0)
+  isActive        Boolean   @default(true)
+  
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  clientId      String
+  personnelId   String
+  serviceId     String
+  appointmentDate DateTime
+  duration      Int               // Duration in minutes
+  status        AppointmentStatus @default(SCHEDULED)
+  notes         String?
+  price         Float?
+  isOnline      Boolean           @default(false)
+  meetLink      String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  personnel   Personnel   @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  transaction Transaction?
+  sessionNote SessionNote?
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  appointmentId String?         @unique
+  clientId      String?
+  amount        Float
+  type          TransactionType
+  paymentMethod PaymentMethod
+  description   String?
+  category      String?         // For expenses
+  transactionDate DateTime      @default(now())
+  createdAt     DateTime        @default(now())
+  
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  client      Client?      @relation(fields: [clientId], references: [id])
+}
+
+model SessionNote {
+  id            String    @id @default(cuid())
+  appointmentId String    @unique
+  clientId      String
+  personnelId   String
+  content       String
+  isConfidential Boolean  @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  personnel   Personnel   @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Enums
+enum UserRole {
+  ADMINISTRATOR
+  COORDINATOR
+  PSYCHOLOGIST
+  CLIENT
+}
+
+enum ServiceType {
+  INDIVIDUAL_THERAPY
+  COUPLES_THERAPY
+  FAMILY_THERAPY
+  CHILD_ADOLESCENT_THERAPY
+  ONLINE_THERAPY
+  GROUP_THERAPY
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  IN_PROGRESS
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  BANK_TRANSFER
+  PACKAGE
+}
+
+enum AssignmentType {
+  BOOK
+  READING
+  WRITING
+  EXERCISE
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+model Assignment {
+  id              String           @id @default(cuid())
+  clientId        String
+  personnelId     String
+  title           String
+  description     String           @db.Text
+  type            AssignmentType
+  status          AssignmentStatus @default(PENDING)
+  dueDate         DateTime?
+  completedAt     DateTime?
+  notes           String?          @db.Text
+  clientFeedback  String?          @db.Text
+  attachments     Json?            // Array of S3 paths for files uploaded by personnel
+  submissions     Json?            // Array of S3 paths for files uploaded by client
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  personnel       Personnel        @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  
+  @@index([clientId])
+  @@index([personnelId])
+  @@index([status])
+}
