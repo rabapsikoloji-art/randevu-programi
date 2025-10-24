@@ -119,8 +119,7 @@ export async function GET(req: NextRequest) {
           }
         });
 
-        const monthlyRevenue = monthlyTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-        stats.monthlyRevenue = monthlyRevenue;
+        const monthlyRevenue = monthlyTransactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
       }
     }
 
