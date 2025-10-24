@@ -74,9 +74,10 @@ export async function GET(request: Request) {
 
     // Update overdue assignments
     const now = new Date();
+    type AssignmentWithRelations = typeof assignments[number];
     const overdueIds = assignments
-      .filter(a => a.dueDate && a.dueDate < now && a.status !== 'COMPLETED')
-      .map(a => a.id);
+      .filter((a: AssignmentWithRelations) => a.dueDate && a.dueDate < now && a.status !== 'COMPLETED')
+      .map((a: AssignmentWithRelations) => a.id);
 
     if (overdueIds.length > 0) {
       await prisma.assignment.updateMany({
